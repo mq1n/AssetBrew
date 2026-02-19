@@ -1,0 +1,20 @@
+# GPU / AI Upscaling dependencies (optional)
+# Install INSTEAD of requirements.txt: pip install -r requirements-gpu.txt
+# Phase 1 (AI Upscale) is skipped automatically if these are missing.
+
+# Core dependencies (same as requirements.txt but with GPU onnxruntime)
+numpy>=1.24.0,<3.0
+Pillow>=10.0.0,<12.0
+opencv-python-headless>=4.8.0,<5.0
+scipy>=1.11.0,<2.0
+tqdm>=4.65.0,<5.0
+pyyaml>=6.0,<7.0
+onnxruntime-gpu>=1.15.0,<2.0  # GPU variant — do NOT install alongside onnxruntime (CPU)
+
+# GPU / upscaling
+# Real-ESRGAN / BasicSR is currently broken on Python 3.13+.
+# Use Python 3.10-3.12 for GPU upscaling dependencies.
+torch>=2.3.0,<3.0; python_version < "3.13"
+torchvision>=0.18.0,<1.0; python_version < "3.13"
+realesrgan==0.3.0; python_version < "3.13"
+basicsr==1.4.2; python_version < "3.13"

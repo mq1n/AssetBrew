@@ -1,0 +1,404 @@
+# ============================================
+# Game Asset Visual Upgrade Pipeline v1.0
+# ============================================
+
+# --- Directories ---
+input_dir: "./assets/source"
+output_dir: "./assets/output"
+intermediate_dir: "./assets/intermediate"
+comparison_dir: "./assets/comparisons"
+manifest_path: "./assets/manifest.csv"
+
+# --- Global ---
+max_workers: 4           # Parallel threads (GPU phases always use 1)
+device: "auto"           # "auto" | "cuda" | "cpu"
+log_level: "INFO"
+dry_run: false
+cleanup_intermediates: false  # Remove intermediate dir after pipeline completes
+max_image_pixels: 67108864    # 8192x8192 max; 0 = unlimited
+phase_timeout_seconds: 900
+phase_failure_abort_ratio: 0.90
+phase_failure_abort_min_processed: 10
+
+supported_formats:
+  - ".png"
+  - ".jpg"
+  - ".jpeg"
+  - ".tga"
+  - ".bmp"
+  - ".tiff"
+  - ".tif"
+  - ".dds"
+
+# ============================================
+# Phase 1: AI Upscaling
+# ============================================
+upscale:
+  enabled: true
+  model_name: "RealESRGAN_x4plus"
+  scale_factor: 4
+  target_resolution: 2048
+  hero_resolution: 4096
+  enforce_power_of_two: false
+  tile_size: 512            # Lower if OOM (256, 128)
+  tile_pad: 32
+  half_precision: true
+  preserve_tiling: true
+  model_dir: "./models"     # Local model cache directory
+  model_sha256: {}          # Required for secure auto-downloads, e.g. {RealESRGAN_x4plus: "<sha256>"}
+  allow_unverified_model_download: false  # Not recommended; production should keep this false
+
+  hero_asset_patterns:
+    - "character"
+    - "face"
+    - "hero"
+    - "player"
+    - "weapon"
+    - "main"
+
+  tiling_asset_patterns:
+    - "floor"
+    - "wall"
+    - "ground"
+    - "brick"
+    - "tile"
+    - "wood"
+    - "stone"
+    - "concrete"
+    - "metal"
+    - "fabric"
+    - "grass"
+    - "dirt"
+    - "sand"
+    - "rock"
+
+  skip_types: ["ui", "mask"]
+  nearest_neighbor_types: ["mask", "opacity"]
+
+# ============================================
+# Phase 2: PBR Material Conversion
+# ============================================
+pbr:
+  enabled: true
+  generate_roughness: true
+  generate_metalness: true
+  generate_ao: true
+  delight_diffuse: true
+  delight_method: "multifrequency"   # "gaussian" | "multifrequency"
+  delight_strength: 1.0
+  delight_low_frequency_sigma: 48.0
+  delight_mid_frequency_sigma: 12.0
+  delight_shadow_lift: 0.12
+  delight_highlight_suppress: 0.25
+  generate_gloss: false              # Optional roughness -> gloss output
+  material_zone_masks: true
+  apply_zone_pbr_adjustments: true
+  zone_blur_radius: 5
+
+  zone_roughness_bias:
+    metal: -0.22
+    cloth: 0.18
+    leather: 0.08
+    skin: 0.02
+
+  zone_metalness_floor:
+    metal: 0.75
+    cloth: 0.0
+    leather: 0.0
+    skin: 0.0
+
+  roughness_base_value: 0.5
+  roughness_variance_weight: 0.5
+  roughness_sobel_weight: 0.3
+  roughness_laplacian_weight: 0.2
+
+  material_roughness_defaults:
+    metal: 0.25
+    wood: 0.65
+    stone: 0.70
+    brick: 0.75
+    fabric: 0.85
+    plastic: 0.40
+    glass: 0.10
+    skin: 0.55
+    leather: 0.60
+    concrete: 0.80
+    default: 0.50
+
+  material_metalness_defaults:
+    metal: 0.95
+    gold: 1.0
+    silver: 1.0
+    iron: 0.90
+    copper: 0.95
+    default: 0.0
+
+  ao_strength: 1.0
+  ao_radius: 8
+
+# ============================================
+# Phase 3: Normal Map Generation
+# ============================================
+normal:
+  enabled: true
+  method: "hybrid"          # "sobel" | "hybrid" | "deepbump"
+  strength: 1.0
+  sobel_blur_radius: 1
+  invert_y: false           # true for DirectX, false for OpenGL
+  generate_height: true
+  height_high_pass_radius: 5
+  height_contrast: 1.5
+  height_normalize: true
+  validate_normals: true
+  deepbump_overlap: "LARGE"
+  deepbump_seamless_height: true
+
+# ============================================
+# Phase 4: POM
+# ============================================
+pom:
+  enabled: true
+  height_scale_defaults:
+    brick: 0.05
+    cobblestone: 0.08
+    stone: 0.06
+    wood: 0.03
+    fabric: 0.02
+    metal: 0.01
+    tile: 0.04
+    concrete: 0.03
+    default: 0.04
+  min_samples: 8
+  max_samples: 32
+  lod_fade_start: 2
+  bilateral_filter_d: 5
+  bilateral_sigma_color: 0.3
+  bilateral_sigma_space: 75.0
+
+# ============================================
+# Phase 6: Mipmap Generation
+# ============================================
+mipmap:
+  enabled: true
+  filter_method: "lanczos"
+  srgb_downsampling: true
+  renormalize_normals: true
+  increase_roughness_per_mip: true
+  roughness_mip_increase: 0.04
+  sharpen_mips: true
+  sharpen_levels: [1, 2, 3]
+  sharpen_strength: 0.3
+  sharpen_radius: 1
+  min_resident_mips: 3
+
+# ============================================
+# Texture Compression
+# ============================================
+compression:
+  enabled: true
+  tool: "compressonator"
+  tool_path: ""             # Set to your compressonatorcli binary path
+  tool_timeout_seconds: 60  # Abort per texture if compressor runs too long
+  # Compressonator BC6H/BC7 speed knobs
+  compressonator_encode_with: "hpc"
+  compressonator_num_threads: 0    # 0 = tool auto
+  compressonator_performance: null # null = tool default
+  compressonator_no_progress: true
+  format_map:
+    diffuse: "bc7"
+    albedo: "bc7"
+    normal: "bc5"
+    height: "bc4"
+    roughness: "bc4"
+    metalness: "bc4"
+    ao: "bc4"
+    specular: "bc7"
+    emissive: "bc7"
+    opacity: "bc4"
+    mask: "bc4"
+    ui: "bc7"
+    orm: "bc7"
+    unknown: "bc7"
+    diffuse_alpha: "bc3"    # Optional lighter RGBA path for base textures with alpha
+    albedo_alpha: "bc3"
+    specular_alpha: "bc3"
+    emissive_alpha: "bc3"
+    ui_alpha: "bc3"
+    unknown_alpha: "bc3"
+  quality: 0.85
+  generate_dds: true
+  generate_ktx2: false           # Requires toktx or basisu on PATH
+
+# ============================================
+# Phase 5a: ORM Channel Packing
+# ============================================
+# Packs AO, Roughness, Metalness into a single RGB texture.
+# Saves 2 texture slots per material in your engine.
+orm_packing:
+  enabled: true
+  preset: "unreal_orm"       # unreal_orm | unity_mas | source_phong | idtech_rma | custom
+  r_channel: "ao"           # What goes in the Red channel
+  g_channel: "roughness"    # Green channel
+  b_channel: "metalness"    # Blue channel
+  alpha_channel: "none"
+  custom_layout: {}
+  output_suffix: "_orm"
+  generate_gloss_in_diffuse_alpha: false
+  gloss_source: "roughness" # roughness | gloss
+  overwrite_existing_alpha: true
+
+# ============================================
+# Phase 5b: Color Consistency
+# ============================================
+# Matches color histograms across textures of the same material type.
+# Prevents visual inconsistency between assets.
+color_consistency:
+  enabled: true
+  reference_image: ""       # Auto-select median if empty
+  correction_strength: 0.6  # 0 = no correction, 1 = full match
+  group_by_material: true   # Group assets by material category
+
+# ============================================
+# Phase 5c: Color Grading
+# ============================================
+color_grading:
+  enabled: true
+  process_in_linear: true
+  apply_to_texture_types: ["diffuse", "albedo", "specular", "emissive", "ui", "unknown"]
+  white_balance_shift: 0.0
+  white_balance_per_material: {}
+  exposure_ev: 0.0
+  exposure_per_material: {}
+  midtone_gamma: 1.0
+  midtone_gamma_per_material: {}
+  saturation: 1.0
+  saturation_per_material: {}
+  lut_path: ""              # Optional .cube LUT path
+  lut_strength: 0.0         # 0..1
+  denoise_strength: 0.0     # 0 disables
+  sharpen_strength: 0.0     # 0 disables
+  sharpen_radius: 1
+  auto_plausible_albedo_clamp: true
+  plausible_albedo_min: 0.02
+  plausible_albedo_max: 0.90
+
+# ============================================
+# Phase 5d: Specular Anti-Aliasing
+# ============================================
+# Increases roughness based on normal map variance.
+# Eliminates sparkle/shimmer on detailed normal maps at distance.
+specular_aa:
+  enabled: true
+  variance_threshold: 0.001
+  max_roughness_increase: 0.15
+  kernel_size: 3
+
+# ============================================
+# Phase 5e: Detail Map Overlay
+# ============================================
+# Overlays a tiling micro-detail normal map for close-up quality.
+# Requires a detail normal texture (provide your own).
+detail_map:
+  enabled: false            # Enable after providing detail_normal_path
+  detail_normal_path: ""    # Path to your tiling detail normal texture
+  detail_uv_scale: 8.0
+  detail_strength: 0.3
+  detail_fade_distance: 5.0
+  apply_to_categories:
+    - "stone"
+    - "concrete"
+    - "brick"
+    - "wood"
+    - "metal"
+    - "fabric"
+
+# ============================================
+# Phase 5f: Emissive Detection
+# ============================================
+emissive:
+  enabled: true
+  luminance_threshold: 0.80
+  saturation_threshold: 0.35
+  value_threshold: 0.85
+  min_region_ratio: 0.0005
+  boost: 1.0
+
+# ============================================
+# Phase 5g: Reflection Mask
+# ============================================
+reflection_mask:
+  enabled: true
+  metalness_weight: 0.65
+  gloss_weight: 0.35
+  bias: 0.0
+
+# ============================================
+# Phase 5h: Seam Repair
+# ============================================
+seam_repair:
+  enabled: true
+  only_tileable: true
+  repair_border_width: 12
+  detect_threshold: 0.08
+  blend_strength: 0.85
+  inpaint_radius: 2
+
+# ============================================
+# GPU Memory Management
+# ============================================
+gpu:
+  enabled: true
+  max_vram_mb: 0            # 0 = auto (80% of available VRAM)
+  min_tile_size: 128        # Minimum before falling back to CPU
+  log_vram: true
+  fallback_to_cpu: true     # Fall back to CPU on persistent OOM
+
+# ============================================
+# Checkpoint / Resume
+# ============================================
+# Enables crash recovery and incremental processing.
+# Skip already-processed assets whose files haven't changed.
+checkpoint:
+  enabled: true
+  checkpoint_path: "./assets/checkpoint.json"
+  save_interval: 10         # Save checkpoint every N assets
+  skip_completed: true      # Skip assets that match previous hash
+
+# ============================================
+# Phase 7: Validation
+# ============================================
+validation:
+  enabled: true
+  check_tiling: true
+  check_normals: true
+  render_test_sphere: true  # Renders each texture on a lit sphere
+  regression_diff: false          # Compare against previous output
+  max_allowed_diff: 0.15
+  output_comparison: true
+  sphere_resolution: 512
+  sphere_light_angles: 4
+  enforce_material_semantics: true
+  strict_material_semantics: true
+  warn_on_heuristic_maps: true
+  fail_on_heuristic_maps: false
+  require_full_mipchain: true
+  metalness_nonmetal_max_mean: 0.25
+  metalness_metal_min_mean: 0.55
+  metalness_midband_max_ratio: 0.70
+  roughness_min_stddev: 0.01
+  ao_min_stddev: 0.005
+  enforce_plausible_albedo: true
+  albedo_linear_min: 0.02
+  albedo_linear_max: 0.90
+  albedo_black_ratio_max: 0.02
+  albedo_white_ratio_max: 0.02
+
+# ============================================
+# Tiling Quality Scoring
+# ============================================
+tiling_quality:
+  enabled: true
+  border_width: 8
+  warn_score: 0.75
+  fail_score: 0.55
+  auto_flag_top_n: 20

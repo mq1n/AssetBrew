@@ -1,0 +1,16 @@
+# Core dependencies (required for all phases except AI upscaling)
+numpy>=1.24.0,<3.0
+Pillow>=10.0.0,<12.0       # DDS (BC1-BC7/DXT) read support included
+opencv-python-headless>=4.8.0,<5.0
+scipy>=1.11.0,<2.0
+tqdm>=4.65.0,<5.0
+pyyaml>=6.0,<7.0
+
+# Optional dependencies:
+# - DeepBump on CPU:     pip install "AssetBrew[cpu]"
+# - DeepBump/upscale GPU: pip install "AssetBrew[gpu]"
+
+# Texture compression (external CLI tools -- install separately):
+# Compressonator: https://github.com/GPUOpen-Tools/compressonator
+# texconv (Windows): https://github.com/microsoft/DirectXTex
+# KTX2: toktx from https://github.com/KhronosGroup/KTX-Software

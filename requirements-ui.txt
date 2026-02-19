@@ -1,0 +1,3 @@
+# UI dependencies layered on top of core requirements.
+-r requirements.txt
+PyQt6>=6.6.0,<7.0

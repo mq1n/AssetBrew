@@ -1,0 +1,76 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "AssetBrew"
+dynamic = ["version"]
+description = "Automated pipeline for upgrading low-resolution game textures to high-quality PBR-ready assets"
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.10"
+dependencies = [
+    "numpy>=1.24.0,<3.0",
+    "Pillow>=10.0.0,<12.0",
+    "opencv-python-headless>=4.8.0,<5.0",
+    "scipy>=1.11.0,<2.0",
+    "tqdm>=4.65.0,<5.0",
+    "pyyaml>=6.0,<7.0",
+    # onnxruntime is NOT a base dep - install via [cpu] or [gpu] extras.
+    # DeepBump (normal maps) gracefully skips if unavailable.
+]
+
+[project.optional-dependencies]
+cpu = [
+    "onnxruntime>=1.15.0,<2.0",
+]
+gpu = [
+    # Real-ESRGAN / BasicSR setup.py is incompatible with Python 3.13+.
+    # Keep this extra gated to versions known to work.
+    "torch>=2.3.0,<3.0; python_version < '3.13'",
+    "torchvision>=0.18.0,<1.0; python_version < '3.13'",
+    "realesrgan==0.3.0; python_version < '3.13'",
+    "basicsr==1.4.2; python_version < '3.13'",
+    "onnxruntime-gpu>=1.15.0,<2.0; python_version < '3.13'",
+    # Do NOT install alongside onnxruntime (CPU). Use [gpu] OR [cpu], not both.
+]
+dev = [
+    "pytest>=7.0",
+    "pytest-cov>=4.1.0",
+    "pytest-timeout>=2.2.0",
+    "ruff>=0.1.0",
+]
+ui = [
+    "PyQt6>=6.6.0,<7.0",
+]
+
+[project.scripts]
+AssetBrew = "AssetBrew.cli:main"
+AssetBrew-ui = "AssetBrew.ui.app:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-dir]
+"" = "src"
+
+[tool.setuptools.dynamic]
+version = {attr = "AssetBrew.__version__"}
+
+[tool.setuptools.package-data]
+AssetBrew = ["py.typed"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+addopts = "--timeout=180 --cov=AssetBrew --cov-report=term-missing --cov-fail-under=60 -m 'not slow'"
+markers = ["slow: DDS/KTX2 image compilation tests (deselected by default)"]
+norecursedirs = ["assets", "temp_test", "_review_out", "bin", ".git", "__pycache__", "*.egg-info", "sandbox_tmp", ".*"]
+
+[tool.coverage.run]
+omit = [
+    "src/AssetBrew/ui/app.py",
+]
+
+[tool.coverage.report]
+fail_under = 60

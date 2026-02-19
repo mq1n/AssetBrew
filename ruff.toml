@@ -1,0 +1,12 @@
+src = ["src"]
+exclude = ["bin/"]
+line-length = 100
+
+[lint]
+select = ["E", "F", "W", "D"]
+
+[lint.pydocstyle]
+convention = "google"
+
+[lint.per-file-ignores]
+"tests/**/*.py" = ["D"]
