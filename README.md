@@ -57,7 +57,7 @@ Always install into a virtual environment to avoid polluting your system Python.
 ### 1. Clone and enter the repository
 
 ```bash
-git clone <repo-url> AssetBrew
+git clone https://github.com/mq1n/AssetBrew AssetBrew
 cd AssetBrew
 ```
 
