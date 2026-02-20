@@ -1,5 +1,7 @@
 # AssetBrew - Game Asset Visual Upgrade Pipeline
 
+![AssetBrew Preview](preview.png)
+
 Automated pipeline to upgrade low-resolution game textures into PBR-ready outputs at scale.
 Built for large batch runs with checkpoint resume, timeout handling, compression tool integration,
 and GPU memory safeguards.
